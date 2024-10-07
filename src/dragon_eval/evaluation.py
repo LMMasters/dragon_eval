@@ -15,7 +15,7 @@
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -37,6 +37,7 @@ class EvalType(Enum):
     BINARY_CLASSIFICATION_NON_SHARED_TASK = "binary classification different objective across labels (Unweighted Cohen's kappa)"
     ORDINAL_MULTI_CLASS_CLASSIFICATION = "ordinal multi-class classification (Linear Cohen's kappa)"
     NONORDINAL_MULTI_CLASS_CLASSIFICATION = "non-ordinal multi-class classification (Unweighted Cohen's kappa)"
+
 
 TASK_TYPE = {
     # example tasks
@@ -120,7 +121,7 @@ def score_rsmape(
     numerator = np.abs(y_true - y_pred)
     denominator = np.abs(y_true) + np.abs(y_pred) + epsilon
     rsmape = numerator / denominator
-    return 1 - np.mean(rsmape)
+    return float(1 - np.mean(rsmape))
 
 
 def select_entity_labels(labels: List[List[str]], entity_lbl: str) -> List[str]:
@@ -157,7 +158,8 @@ def score_multi_label_f1(
         score = np.average(per_lbl_score, weights=per_lbl_support)
     else:
         raise ValueError(f"Unsupported average: {average}")
-    return score
+
+    return float(score)
 
 
 class DragonEval(ClassificationEvaluation):
@@ -172,29 +174,34 @@ class DragonEval(ClassificationEvaluation):
             join_key="uid",
             **kwargs,
         )
-        self._scores: Dict[str, float] = {}
+        self._scores: Dict[str, Dict[str, float]] = {}
         self.folds = folds
-        self.tasks = tasks
 
-        if self.tasks is None:
+        if tasks is None:
             # get all tasks
-            self.tasks = sorted([
+            self.tasks: list[str] = sorted([
                 path.stem
-                for path in self._ground_truth_path.glob(f"*.json")
+                for path in self._ground_truth_path.glob("*.json")
             ])
             if not self.tasks:
                 raise ValueError("Could not find any tasks!")
         else:
-            # check if all tasks exist
+            # collect task names (possibly using partial names)
             task_names = []
-            for task in self.tasks:
+            for task in tasks:
+                if (self._ground_truth_path / f"{task}.json").exists():
+                    task_names.append(task)
+                    continue
+
                 files_found = [path.stem for path in self._ground_truth_path.glob(f"*{task}*.json")]
                 if not files_found:
                     raise ValueError(f"Could not find task: {task}")
+
                 if len(files_found) > 1:
                     raise ValueError(f"Found multiple tasks matching {task}: {files_found}")
+
                 task_names.append(files_found[0])
-            if len(set(task_names)) != len(self.tasks):
+            if len(set(task_names)) != len(list(tasks)):
                 raise ValueError(f"Duplicate tasks found: {task_names}")
             self.tasks = task_names
 
@@ -232,7 +239,7 @@ class DragonEval(ClassificationEvaluation):
         # select ground truth and prediction columns
         label_column = [col for col in self._cases.columns if col.endswith("_target")][0]
         prediction_column = label_column.replace("_target", "")
-        if not prediction_column in self._cases.columns:
+        if prediction_column not in self._cases.columns:
             raise ValueError(f"Could not find prediction column for {label_column} (job: {job_name})")
 
         y_true = self._cases[label_column]
@@ -331,12 +338,12 @@ class DragonEval(ClassificationEvaluation):
         self._scores[task_name][job_name] = score
 
     @property
-    def _metrics(self) -> Dict:
+    def _metrics(self) -> Dict[str, Any]:
         """Returns the calculated case and aggregate results"""
         return {
             "case": self._scores,
             "aggregates": self._aggregate_results,
-            "version": "0.2.5",
+            "version": "0.2.6",
         }
 
     @staticmethod
@@ -356,14 +363,14 @@ class DragonEval(ClassificationEvaluation):
         """Aggregates the scores"""
         # calculate mean and std for each task
         self._aggregate_results = self.calculate_aggregate_results(self._scores)
-    
+
         # calculate overall score
         self._aggregate_results["overall"] = {
             "mean": np.mean([score["mean"] for score in self._aggregate_results.values()]),
             "std": np.mean([score["std"] for score in self._aggregate_results.values()]),
         }
 
-        print(f"Aggregate results:")
+        print("Aggregate results:")
         for task_name, scores in self._aggregate_results.items():
             print(f"  {task_name}: {scores['mean']:.3f} ± {scores['std']:.3f}")
 
