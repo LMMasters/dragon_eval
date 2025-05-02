@@ -391,12 +391,15 @@ class DragonEval(ClassificationEvaluation):
                     f"Could not find text column for {label_column} (job: {job_name})"
                 )
 
-            score = evaluate_redaction(
-                original=y_orig,
-                ground_truth=y_true,
-                prediction=y_pred,
-                alpha=0.5,
-            )["blended_redaction_f1"]
+            score = [
+                evaluate_redaction(
+                    original=orig,
+                    ground_truth=true,
+                    prediction=pred,
+                    alpha=0.7,
+                )["blended_redaction_f1"]
+                for orig, true, pred in zip(y_orig, y_true, y_pred)
+            ]
 
         else:
             raise ValueError(f"Unexpexted task: {task_name}")
