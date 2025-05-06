@@ -5,7 +5,7 @@ Utilities to score PII‑redacted text at character level.
 
 Usage
 -----
-from redaction_scoring import (
+dragon_eval.redaction_score import (
     evaluate_redaction,                  # weighted, recommended
 )
 
@@ -55,6 +55,12 @@ def _replace_tags_with_placeholders(text: str) -> Tuple[str, Dict[str, str]]:
         The text with placeholders.
     mapping  : dict { placeholder‑char -> original <TAG> }
     """
+    if any("\ue000" <= ch <= "\uf8ff" for ch in text):
+        raise ValueError(
+            "The input text contains characters in the Unicode private-use area (U+E000–U+F8FF), "
+            "which are reserved for placeholders and may cause conflicts."
+        )
+
     pieces: List[str] = []
     mapping: Dict[str, str] = {}
 

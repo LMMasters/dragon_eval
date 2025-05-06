@@ -24,8 +24,8 @@ from sklearn.metrics import cohen_kappa_score, roc_auc_score
 
 from dragon_eval.evalutils.evalutils import ClassificationEvaluation
 from dragon_eval.evalutils.io import FileLoader
-from dragon_eval.evalutils.redaction_score import evaluate_redaction
 from dragon_eval.evalutils.validators import ExpectedColumnNamesValidator
+from dragon_eval.redaction_score import evaluate_redaction
 
 DEFAULT_INPUT_PATH = Path("/input/")
 DEFAULT_GROUND_TRUTH_PATH = Path("/opt/app/ground-truth/")
@@ -388,7 +388,7 @@ class DragonEval(ClassificationEvaluation):
             # metric: blended redaction F1 score
             if y_orig is None:
                 raise ValueError(
-                    f"Could not find text column for {label_column} (job: {job_name})"
+                    f"Could not find original text at {text_column} for label {label_column} (job: {job_name})"
                 )
 
             score = [
