@@ -5,7 +5,7 @@ Utilities to score PII‑redacted text at character level.
 
 Usage
 -----
-dragon_eval.redaction_score import (
+from dragon_eval.redaction_score import (
     evaluate_redaction,                  # weighted, recommended
 )
 
